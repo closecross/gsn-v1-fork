@@ -88,8 +88,6 @@ type IRelay interface {
 
 	IsUnstaked() (removed bool, err error)
 
-	RegistrationDate() (when int64, err error)
-
 	IsRemoved() (removed bool, err error)
 
 	SendBalanceToOwner() (err error)
@@ -324,41 +322,6 @@ func (relay *RelayServer) IsUnstaked() (removed bool, err error) {
 	return true, nil
 }
 
-func (relay *RelayServer) RegistrationDate() (when int64, err error) {
-	lastBlockHeader, err := relay.Client.HeaderByNumber(context.Background(), nil)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	startBlock := uint64(0)
-	if lastBlockHeader.Number.Uint64() > relay.RegistrationBlockRate {
-		startBlock = lastBlockHeader.Number.Uint64() - relay.RegistrationBlockRate
-	}
-	filterOpts := &bind.FilterOpts{
-		Start: startBlock,
-		End:   nil,
-	}
-	iter, err := relay.rhub.FilterRelayAdded(filterOpts, []common.Address{relay.Address()}, nil)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	if (iter.Event == nil && !iter.Next()) ||
-		(bytes.Compare(iter.Event.Relay.Bytes(), relay.Address().Bytes()) != 0) ||
-		(iter.Event.TransactionFee.Cmp(relay.Fee) != 0) ||
-		(iter.Event.Url != relay.Url) {
-		return 0, fmt.Errorf("Could not receive RelayAdded() events for our relay")
-	}
-	lastRegisteredHeader, err := relay.Client.HeaderByNumber(context.Background(), big.NewInt(int64(iter.Event.Raw.BlockNumber)))
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	when = lastRegisteredHeader.Time.Int64()
-	return
-}
-
 func (relay *RelayServer) IsRemoved() (removed bool, err error) {
 	filterOpts := &bind.FilterOpts{
 		Start: 0,
@@ -457,7 +420,7 @@ func (relay *RelayServer) CreateRelayTransaction(request RelayTransactionRequest
 		errStr := fmt.Sprintln("EncodedFunction:", request.EncodedFunction, "From:", request.From.Hex(), "To:", request.To.Hex(),
 			"GasPrice:", request.GasPrice.String(), "GasLimit:", request.GasLimit.String(), "Nonce:", request.RecipientNonce.String(), "Fee:",
 			request.RelayFee.String(), "AppData:", hexutil.Encode(request.ApprovalData), "Sig:", hexutil.Encode(request.Signature))
-		errStr = errStr[:len(errStr) - 1]
+		errStr = errStr[:len(errStr)-1]
 		err = fmt.Errorf("canRelay() view function returned error code=%d. params:%s", res, errStr)
 		log.Println(err)
 		return
@@ -846,7 +809,7 @@ func (relay *RelayServer) Close() (err error) {
  * @return Gas cost of encoded function as parameter in relayedCall
  * As per the yellowpaper, each non-zero byte costs 68 and zero byte costs 4
  */
-func getEncodedFunctionGas(encodedFunction string) (*big.Int){
+func getEncodedFunctionGas(encodedFunction string) *big.Int {
 	if strings.HasPrefix(encodedFunction, "0x") {
 		encodedFunction = encodedFunction[2:]
 	}

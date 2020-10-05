@@ -280,13 +280,6 @@ func TestRegisterRelay(t *testing.T) {
 	}
 	client.Commit()
 	test.ErrFail(relay.awaitTransactionMined(tx), t)
-	when, err := relay.RegistrationDate()
-	if err != nil {
-		fmt.Println("ERROR", err)
-	}
-	if time.Now().Unix()-when > int64((1 * time.Minute).Seconds()) {
-		t.Error("Wrong registration time/date", time.Now().Unix(), when)
-	}
 }
 
 func printSignature(txb string, txFee int64, gasPrice int64, gasLimit int64, relayMaxNonce int64, recipientNonce int64) {
@@ -531,10 +524,10 @@ func TestTransactionTotalGasCost(t *testing.T) {
 	receipt2, err := client.TransactionReceipt(context.Background(), signedTx2.Hash())
 	test.ErrFailWithDesc(err, t, fmt.Sprint("Fetching transaction receipt for hash ", signedTx2.Hash()))
 
-	if  (getEncodedFunctionGas(request2.EncodedFunction).Uint64() - getEncodedFunctionGas(request1.EncodedFunction).Uint64() != expectedGasDiff){
+	if getEncodedFunctionGas(request2.EncodedFunction).Uint64()-getEncodedFunctionGas(request1.EncodedFunction).Uint64() != expectedGasDiff {
 		test.ErrFail(errors.New("Wrong gas cost difference between encoded functions"), t)
 	}
-	if (receipt2.GasUsed - receipt1.GasUsed != expectedGasDiff) {
+	if receipt2.GasUsed-receipt1.GasUsed != expectedGasDiff {
 		test.ErrFail(errors.New("Wrong gasUsed difference between relayed transactions"), t)
 	}
 
